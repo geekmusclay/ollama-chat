@@ -151,6 +151,9 @@
 
 <script>
 import axios from 'axios';
+import { marked } from 'marked';
+import hljs from 'highlight.js';
+import 'highlight.js/styles/atom-one-dark.css'; // Thème de coloration syntaxique
 
 export default {
   name: 'ChatView',
@@ -174,10 +177,25 @@ export default {
     };
   },
   created() {
+    // Initialiser les données lors de la création du composant
     this.fetchModels();
     if (this.id && this.id !== 'new') {
       this.fetchConversation();
     }
+    
+    // Configuration de marked pour la coloration syntaxique
+    marked.setOptions({
+      highlight: function(code, lang) {
+        const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+        return hljs.highlight(code, { language }).value;
+      },
+      langPrefix: 'hljs language-', // Préfixe pour les classes CSS
+      gfm: true, // GitHub Flavored Markdown
+      breaks: true, // Convertir les retours à la ligne en <br>
+      sanitize: false, // Ne pas sanitizer le HTML (attention aux risques XSS)
+      smartLists: true, // Listes intelligentes
+      smartypants: true // Guillemets intelligents, tirets, etc.
+    });
   },
   mounted() {
     // Ajouter un écouteur d'événement pour redimensionner le textarea au chargement initial
@@ -232,6 +250,7 @@ export default {
         this.error = 'Impossible de charger la conversation. Veuillez réessayer plus tard.';
       } finally {
         this.loading = false;
+        hljs.highlightAll();
       }
     },
     
@@ -401,16 +420,28 @@ export default {
     },
     
     formatMessage(content) {
-      // Convertir les sauts de ligne en balises <br>
-      let formatted = content.replace(/\n/g, '<br>');
+      if (!content) return '';
       
-      // Convertir les blocs de code
-      formatted = formatted.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-      
-      // Convertir les lignes de code inline
-      formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
-      
-      return formatted;
+      try {
+        // Utiliser marked pour convertir le Markdown en HTML
+        let html = marked.parse(content);
+        
+        // Ajouter des classes CSS pour les tableaux
+        html = html
+          .replace(/<table>/g, '<table class="markdown-table">')
+          .replace(/<thead>/g, '<thead class="markdown-thead">')
+          .replace(/<tbody>/g, '<tbody class="markdown-tbody">');
+        
+        // Ajouter des classes CSS pour les blocs de code
+        html = html
+          .replace(/<pre>/g, '<pre class="markdown-pre">')
+          .replace(/<code>/g, '<code class="markdown-code">');
+
+        return html;
+      } catch (error) {
+        console.error('Erreur lors du formatage du message:', error);
+        return content;
+      }
     },
     
     formatDate(dateString) {
@@ -666,24 +697,92 @@ export default {
   background-color: var(--input-bg);
   padding: 12px;
   border-radius: 6px;
+  padding: 12px;
   overflow-x: auto;
-  margin: 12px 0;
-  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-  font-size: 14px;
-  line-height: 1.4;
-  color: var(--input-text);
-  border: 1px solid var(--border-color);
+  margin: 10px 0;
+  position: relative;
 }
 
 .message-content code {
-  background-color: var(--input-bg);
+  background-color: var(--inline-code-background);
   padding: 2px 4px;
   border-radius: 4px;
-  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-family: monospace;
   font-size: 0.9em;
-  color: var(--input-text);
-  border: 1px solid var(--border-color);
 }
+
+.message-content pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  display: block;
+  overflow-x: auto;
+  color: var(--code-text-color);
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.message-content .markdown-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+  overflow: auto;
+  display: block;
+  max-width: 100%;
+}
+
+.message-content .markdown-table th,
+.message-content .markdown-table td {
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.message-content .markdown-table th {
+  background-color: var(--table-header-bg);
+  font-weight: 600;
+}
+
+.message-content .markdown-table tr:nth-child(even) {
+  background-color: var(--table-row-alt-bg);
+}
+
+.message-content ul,
+.message-content ol {
+  padding-left: 20px;
+  margin: 10px 0;
+}
+
+.message-content li {
+  margin-bottom: 5px;
+}
+
+.message-content blockquote {
+  border-left: 4px solid var(--blockquote-border);
+  padding-left: 16px;
+  margin: 16px 0;
+  color: var(--blockquote-text);
+  font-style: italic;
+}
+
+.message-content h1,
+.message-content h2,
+.message-content h3,
+.message-content h4,
+.message-content h5,
+.message-content h6 {
+  margin-top: 20px;
+  margin-bottom: 10px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.message-content h1 { font-size: 1.8em; }
+.message-content h2 { font-size: 1.5em; }
+.message-content h3 { font-size: 1.3em; }
+.message-content h4 { font-size: 1.1em; }
+.message-content h5 { font-size: 1em; }
+.message-content h6 { font-size: 0.9em; }
 
 .message-actions {
   display: flex;

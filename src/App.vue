@@ -105,6 +105,13 @@ export default {
   --button-color: #ffffff;
   --button-hover: #0d8c6d;
   --shadow-color: rgba(0, 0, 0, 0.3);
+  --code-background: #1e1e2e;
+  --inline-code-background: #2d2d3a;
+  --code-text-color: #e4e4e7;
+  --table-header-bg: #2d2d3a;
+  --table-row-alt-bg: #3a3a48;
+  --blockquote-border: #4d4d4f;
+  --blockquote-text: #a1a1aa;
 }
 
 * {
