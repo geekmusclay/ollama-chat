@@ -82,6 +82,14 @@
           <!-- Contenu du message -->
           <div class="message-body" :class="message.role">
             <div class="message-content" v-html="formatMessage(message.content)"></div>
+        <!-- Indicateur de streaming -->
+        <div v-if="message.isStreaming" class="streaming-indicator">
+          <div class="typing-indicator">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
             <div class="message-actions">
               <span class="message-time">{{ formatDate(message.created_at) }}</span>
             </div>
@@ -272,58 +280,110 @@ export default {
       this.messages.push(userMessage);
       this.scrollToBottom();
       
-      // Envoyer le message à l'API
+      // Ajouter un message vide pour l'assistant (sera rempli par le streaming)
+      const assistantMessage = {
+        id: 'temp-assistant-' + Date.now(),
+        conversation_id: this.conversation.id,
+        role: 'assistant',
+        content: '',
+        created_at: new Date().toISOString(),
+        isStreaming: true // Indicateur que ce message est en cours de streaming
+      };
+      
+      this.messages.push(assistantMessage);
+      this.scrollToBottom();
+      
+      // Utiliser EventSource pour recevoir les données en streaming
       try {
-        const response = await axios.post(`http://localhost:8000/back/conversations/${this.conversation.id}/messages`, {
-          content: messageContent,
-          model: this.selectedModel
+        // D'abord enregistrer le message de l'utilisateur
+        const userResponse = await axios.post(`http://localhost:8000/back/conversations/${this.conversation.id}/messages/user`, {
+          content: messageContent
         });
         
-        if (response.data.success) {
-          // Remplacer le message temporaire par celui de l'API
-          const index = this.messages.findIndex(m => m.id === userMessage.id);
-          if (index !== -1) {
-            this.messages[index] = {
-              id: response.data.data.userMessageId,
-              conversation_id: this.conversation.id,
-              role: 'user',
-              content: messageContent,
-              created_at: new Date().toISOString()
-            };
-          }
-          
-          // Ajouter la réponse de l'assistant
-          // Déterminer le contenu de la réponse en fonction des clés disponibles
-          let responseContent = '';
-          const aiResponse = response.data.data.aiResponse;
-          
-          if (aiResponse.response) {
-            responseContent = aiResponse.response;
-          } else if (aiResponse.content) {
-            responseContent = aiResponse.content;
-          } else if (aiResponse.text) {
-            responseContent = aiResponse.text;
-          } else {
-            // Fallback si aucune clé attendue n'est trouvée
-            responseContent = 'Réponse reçue mais format non reconnu';
-            console.warn('Format de réponse non reconnu:', aiResponse);
-          }
-          
-          this.messages.push({
-            id: response.data.data.aiMessageId,
-            conversation_id: this.conversation.id,
-            role: 'assistant',
-            content: responseContent,
-            created_at: new Date().toISOString()
-          });
-          
-          this.scrollToBottom();
-        } else {
-          this.error = 'Erreur lors de l\'envoi du message';
+        if (!userResponse.data.success) {
+          throw new Error(userResponse.data.error || 'Erreur lors de l\'enregistrement du message utilisateur');
         }
+        
+        // Remplacer l'ID temporaire du message utilisateur
+        const userIndex = this.messages.findIndex(m => m.id === userMessage.id);
+        if (userIndex !== -1) {
+          this.messages[userIndex].id = userResponse.data.data.messageId;
+        }
+        
+        // Créer l'URL pour le streaming
+        const streamUrl = `http://localhost:8000/back/conversations/${this.conversation.id}/messages/stream?model=${this.selectedModel}`;
+        
+        // Créer une nouvelle connexion EventSource
+        const eventSource = new EventSource(streamUrl);
+        
+        // Trouver l'index du message assistant temporaire
+        const assistantIndex = this.messages.findIndex(m => m.id === assistantMessage.id);
+        
+        // Gérer les événements de données
+        eventSource.addEventListener('message', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.content) {
+              // Ajouter le contenu au message existant
+              if (assistantIndex !== -1) {
+                this.messages[assistantIndex].content += data.content;
+                this.scrollToBottom();
+              }
+            }
+          } catch (e) {
+            console.error('Erreur lors du parsing des données de streaming:', e);
+          }
+        });
+        
+        // Gérer l'événement de fin
+        eventSource.addEventListener('done', async () => {
+          // Fermer la connexion
+          eventSource.close();
+          
+          // Enregistrer le message complet dans la base de données
+          if (assistantIndex !== -1) {
+            try {
+              const saveResponse = await axios.post(`http://localhost:8000/back/conversations/${this.conversation.id}/messages/assistant`, {
+                content: this.messages[assistantIndex].content
+              });
+              
+              if (saveResponse.data.success) {
+                // Mettre à jour l'ID du message avec celui retourné par l'API
+                this.messages[assistantIndex].id = saveResponse.data.data.messageId;
+                this.messages[assistantIndex].isStreaming = false;
+              }
+            } catch (saveError) {
+              console.error('Erreur lors de l\'enregistrement du message assistant:', saveError);
+            }
+          }
+          
+          this.isGenerating = false;
+        });
+        
+        // Gérer les erreurs
+        eventSource.addEventListener('error', (error) => {
+          console.error('Erreur de streaming:', error);
+          eventSource.close();
+          
+          if (assistantIndex !== -1) {
+            if (!this.messages[assistantIndex].content) {
+              this.messages[assistantIndex].content = 'Erreur lors de la génération de la réponse.';
+            }
+            this.messages[assistantIndex].isStreaming = false;
+          }
+          
+          this.error = 'Erreur lors de la réception de la réponse';
+          this.isGenerating = false;
+        });
       } catch (error) {
         console.error('Erreur lors de l\'envoi du message:', error);
         this.error = 'Impossible d\'envoyer le message. Veuillez réessayer plus tard.';
+        
+        // Supprimer le message assistant vide en cas d'erreur
+        const assistantIndex = this.messages.findIndex(m => m.id === assistantMessage.id);
+        if (assistantIndex !== -1) {
+          this.messages.splice(assistantIndex, 1);
+        }
       } finally {
         this.isGenerating = false;
         this.$nextTick(() => {
@@ -389,7 +449,7 @@ export default {
 .chat-view {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 110px); /* Hauteur totale moins header et footer */
+  height: 90vh; /* Hauteur totale moins header et footer */
   background-color: var(--chat-background);
 }
 
@@ -397,7 +457,7 @@ export default {
 .chat-header {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 12px 250px;
   border-bottom: 1px solid var(--border-color);
   background-color: var(--header-bg);
   color: var(--header-color);
@@ -674,7 +734,7 @@ export default {
 
 /* Zone de saisie */
 .chat-input-container {
-  padding: 16px;
+  padding: 16px 250px;
   border-top: 1px solid var(--border-color);
   background-color: var(--background-color);
 }
