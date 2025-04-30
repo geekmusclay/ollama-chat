@@ -12,8 +12,43 @@
       </div>
       
       <div class="header-center">
-        <h1 v-if="conversation" class="chat-title">{{ conversation.title }}</h1>
-        <h1 v-else class="chat-title">Nouvelle conversation</h1>
+        <!-- Mode affichage du titre -->
+        <div v-if="!isEditingTitle" class="title-display">
+          <h1 v-if="conversation" class="chat-title">{{ conversation.title }}</h1>
+          <h1 v-else class="chat-title">Nouvelle conversation</h1>
+          <button v-if="conversation" @click="startEditingTitle" class="edit-title-btn" title="Modifier le titre">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <!-- Mode édition du titre -->
+        <div v-else class="title-edit-form">
+          <input 
+            type="text" 
+            v-model="newTitle" 
+            class="title-input"
+            placeholder="Titre de la conversation"
+            @keydown.enter="saveTitle"
+            @keydown.esc="cancelEditingTitle"
+            ref="titleInput"
+          >
+          <div class="title-edit-actions">
+            <button @click="saveTitle" class="save-title-btn" title="Enregistrer">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </button>
+            <button @click="cancelEditingTitle" class="cancel-title-btn" title="Annuler">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
       
       <div class="header-right">
@@ -165,15 +200,17 @@ export default {
   },
   data() {
     return {
+      id: this.$route.params.id,
       conversation: null,
       messages: [],
       userInput: '',
       loading: false,
       error: null,
       isGenerating: false,
-      selectedModel: 'llama3',
       availableModels: ['llama3'],
-      editingTitle: false
+      selectedModel: 'llama3',
+      isEditingTitle: false,
+      newTitle: ''
     };
   },
   created() {
@@ -250,7 +287,6 @@ export default {
         this.error = 'Impossible de charger la conversation. Veuillez réessayer plus tard.';
       } finally {
         this.loading = false;
-        hljs.highlightAll();
       }
     },
     
@@ -452,23 +488,40 @@ export default {
       }).format(date);
     },
     
-    async editTitle() {
-      const newTitle = prompt('Modifier le titre de la conversation', this.conversation.title);
-      if (newTitle && newTitle.trim() && newTitle !== this.conversation.title) {
-        try {
-          const response = await axios.put(`/back/conversations/${this.conversation.id}`, {
-            title: newTitle
-          });
-          
-          if (response.data.success) {
-            this.conversation.title = newTitle;
-          } else {
-            this.error = 'Erreur lors de la modification du titre';
-          }
-        } catch (error) {
-          console.error('Erreur lors de la modification du titre:', error);
-          this.error = 'Impossible de modifier le titre. Veuillez réessayer plus tard.';
+    startEditingTitle() {
+      this.isEditingTitle = true;
+      this.newTitle = this.conversation.title;
+      // Focus sur l'input après le rendu du DOM
+      this.$nextTick(() => {
+        this.$refs.titleInput.focus();
+      });
+    },
+    
+    cancelEditingTitle() {
+      this.isEditingTitle = false;
+      this.newTitle = '';
+    },
+    
+    async saveTitle() {
+      if (!this.newTitle.trim() || this.newTitle === this.conversation.title) {
+        this.cancelEditingTitle();
+        return;
+      }
+      
+      try {
+        const response = await axios.put(`http://localhost:8000/back/conversations/${this.conversation.id}`, {
+          title: this.newTitle
+        });
+        
+        if (response.data.success) {
+          this.conversation.title = this.newTitle;
+          this.isEditingTitle = false;
+        } else {
+          this.error = 'Erreur lors de la modification du titre';
         }
+      } catch (error) {
+        console.error('Erreur lors de la modification du titre:', error);
+        this.error = 'Impossible de modifier le titre. Veuillez réessayer plus tard.';
       }
     }
   }
@@ -522,13 +575,94 @@ export default {
   text-decoration: none;
 }
 
+/* Styles pour le titre et son édition */
+.title-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-direction: row;
+  justify-content: center;
+}
+
 .chat-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 1.2rem;
   font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--header-color);
+}
+
+.edit-title-btn {
+  background: transparent;
+  border: none;
+  color: var(--header-color);
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.edit-title-btn:hover {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.title-edit-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.title-input {
+  flex: 1;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.title-input:focus {
+  border-color: var(--input-focus-border);
+}
+
+.title-edit-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.save-title-btn,
+.cancel-title-btn {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.save-title-btn {
+  color: var(--success-color);
+}
+
+.cancel-title-btn {
+  color: var(--error-color);
+}
+
+.save-title-btn:hover,
+.cancel-title-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .model-selector {
@@ -897,5 +1031,22 @@ textarea:focus {
   font-size: 12px;
   color: var(--secondary-color);
   text-align: center;
+}
+
+.markdown-pre {
+  background: #212121;
+    border: 1px solid #1c1c1c;
+    border-left: 3px solid #f36d33;
+    color: #dddddd;
+    page-break-inside: avoid;
+    font-family: monospace;
+    font-size: 15px;
+    line-height: 1.6;
+    margin-bottom: 1.6em;
+    max-width: 100%;
+    overflow: auto;
+    padding: 1em 1.5em;
+    display: block;
+    word-wrap: break-word;
 }
 </style>
