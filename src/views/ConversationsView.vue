@@ -8,6 +8,7 @@
         </button>
       </div>
       
+      <!-- Contenu du sidebar -->
       <div class="sidebar-content">
         <div v-if="loading" class="loading">
           <div class="loading-spinner"></div>
@@ -24,6 +25,7 @@
           <p class="empty-subtitle">Commencez une nouvelle conversation pour discuter avec Ollama.</p>
         </div>
         
+        <!-- Liste des conversations -->
         <ul v-else class="conversation-list">
           <li v-for="conversation in conversations" :key="conversation.id" class="conversation-item">
             <router-link :to="{ name: 'chat', params: { id: conversation.id } }" class="conversation-link" active-class="active">
@@ -46,6 +48,7 @@
         </ul>
       </div>
       
+      <!-- Footer -->
       <div class="sidebar-footer">
         <div class="user-info">
           <div class="user-avatar">
@@ -73,50 +76,15 @@
         
         <div class="welcome-actions">
           <button class="btn" @click="createNewConversation">
-            Nouvelle conversation
+            <span class="icon">+</span> Nouvelle conversation
+          </button>
+          <button class="btn ms-3" @click="createNewAssistant">
+            <span class="icon">+</span> Nouvel Assistant
           </button>
         </div>
         
-        <div class="welcome-features">
-          <div class="feature">
-            <div class="feature-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-              </svg>
-            </div>
-            <div class="feature-text">
-              <h3>Conversations</h3>
-              <p>Créez et gérez plusieurs conversations</p>
-            </div>
-          </div>
-          
-          <div class="feature">
-            <div class="feature-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M12 16v-4"></path>
-                <path d="M12 8h.01"></path>
-              </svg>
-            </div>
-            <div class="feature-text">
-              <h3>Modèles</h3>
-              <p>Choisissez parmi différents modèles Ollama</p>
-            </div>
-          </div>
-          
-          <div class="feature">
-            <div class="feature-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-              </svg>
-            </div>
-            <div class="feature-text">
-              <h3>Historique</h3>
-              <p>Accédez à l'historique de vos conversations</p>
-            </div>
-          </div>
-        </div>
+        <!-- Features -->
+        <WelcomeFeatures />
       </div>
     </main>
   </div>
@@ -124,9 +92,13 @@
 
 <script>
 import axios from 'axios';
+import WelcomeFeatures from '../components/conversations/WelcomeFeatures.vue';
 
 export default {
   name: 'ConversationsView',
+  components: {
+    WelcomeFeatures
+  },
   data() {
     return {
       conversations: [],
@@ -138,12 +110,13 @@ export default {
     this.fetchConversations();
   },
   methods: {
+    // @TODO use api service
     async fetchConversations() {
       this.loading = true;
       this.error = null;
       
       try {
-        const response = await axios.get('http://localhost:8000/back/conversations');
+        const response = await axios.get('http://localhost:8000/conversations');
         if (response.data.success) {
           this.conversations = response.data.data;
         } else {
@@ -156,10 +129,31 @@ export default {
         this.loading = false;
       }
     },
+
+    // @TODO implement assistant feature
+    async createNewAssistant() {
+      this.$router.push({ name: 'assistant', params: { id: 'new' } });
+      /*try {
+        const response = await axios.post('http://localhost:8000/assistants', {
+          name: 'Nouvel Assistant'
+        });
+        
+        if (response.data.success) {
+          const assistantId = response.data.data.id;
+          this.$router.push({ name: 'assistant', params: { id: assistantId } });
+        } else {
+          this.error = 'Erreur lors de la création de l\'assistant';
+        }
+      } catch (error) {
+        console.error('Erreur lors de la création de l\'assistant:', error);
+        this.error = 'Impossible de créer un nouvel assistant. Veuillez réessayer plus tard.';
+      }*/
+    },
     
+    // @TODO use api service
     async createNewConversation() {
       try {
-        const response = await axios.post('http://localhost:8000/back/conversations', {
+        const response = await axios.post('http://localhost:8000/conversations', {
           title: 'Nouvelle conversation'
         });
         
@@ -175,13 +169,14 @@ export default {
       }
     },
     
+    // @TODO use api service
     async deleteConversation(id) {
       if (!confirm('Êtes-vous sûr de vouloir supprimer cette conversation ?')) {
         return;
       }
       
       try {
-        const response = await axios.delete(`http://localhost:8000/back/conversations/${id}`);
+        const response = await axios.delete(`http://localhost:8000/conversations/${id}`);
         
         if (response.data.success) {
           this.conversations = this.conversations.filter(conv => conv.id !== id);
@@ -451,47 +446,7 @@ export default {
   margin-bottom: 48px;
 }
 
-.welcome-features {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 24px;
-  max-width: 800px;
-  width: 100%;
-}
-
-.feature {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 20px;
-  border-radius: 8px;
-  background-color: var(--background-color);
-  box-shadow: 0 2px 8px var(--shadow-color);
-}
-
-.feature-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background-color: var(--primary-color);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
-}
-
-.feature-text h3 {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: var(--text-color);
-}
-
-.feature-text p {
-  font-size: 14px;
-  color: var(--secondary-color);
-  line-height: 1.4;
+.ms-3 {
+  margin-left: 8px;
 }
 </style>

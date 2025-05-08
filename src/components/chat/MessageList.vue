@@ -90,6 +90,10 @@ export default {
     selectedModel: {
       type: String,
       default: 'llama3'
+    },
+    generating: {
+      type: Boolean,
+      default: false
     }
   },
   emits: ['retry'],
@@ -244,6 +248,7 @@ export default {
   align-items: center;
   justify-content: center;
   margin-right: 12px;
+  padding-top: 5px;
 }
 
 .message-avatar.user {
@@ -286,6 +291,7 @@ export default {
   white-space: pre-wrap;
   word-break: break-word;
   text-align: left;
+  line-height: 1.25;
 }
 
 .message-actions {
@@ -403,11 +409,11 @@ export default {
 :deep(ul),
 :deep(ol) {
   padding-left: 20px;
-  margin: 10px 0;
+  margin: 0;
 }
 
 :deep(li) {
-  margin-bottom: 5px;
+  margin-bottom: 0px;
 }
 
 :deep(blockquote) {

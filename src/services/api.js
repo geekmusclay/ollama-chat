@@ -13,37 +13,37 @@ export default {
   conversations: {
     // Récupérer toutes les conversations
     getAll() {
-      return api.get('/back/conversations');
+      return api.get('/conversations');
     },
     
     // Récupérer une conversation spécifique avec ses messages
     get(id) {
-      return api.get(`/back/conversations/${id}`);
+      return api.get(`/conversations/${id}`);
     },
     
     // Créer une nouvelle conversation
     create(title) {
-      return api.post('/back/conversations', { title });
+      return api.post('/conversations', { title });
     },
     
     // Mettre à jour une conversation
     update(id, data) {
-      return api.put(`/back/conversations/${id}`, data);
+      return api.put(`/conversations/${id}`, data);
     },
     
     // Supprimer une conversation
     delete(id) {
-      return api.delete(`/back/conversations/${id}`);
+      return api.delete(`/conversations/${id}`);
     },
     
     // Récupérer les messages d'une conversation
     getMessages(id) {
-      return api.get(`/back/conversations/${id}/messages`);
+      return api.get(`/conversations/${id}/messages`);
     },
     
     // Ajouter un message à une conversation
     addMessage(id, content, model = 'llama3') {
-      return api.post(`/back/conversations/${id}/messages`, { content, model });
+      return api.post(`/conversations/${id}/messages`, { content, model });
     }
   },
   
@@ -51,12 +51,12 @@ export default {
   ollama: {
     // Récupérer la liste des modèles disponibles
     getModels() {
-      return api.get('/back/models');
+      return api.get('/models');
     },
     
     // Envoyer un message directement à Ollama (sans enregistrement)
     sendMessage(message, model = 'llama3') {
-      return api.post('/back/chat', { message, model });
+      return api.post('/chat', { message, model });
     }
   }
 };

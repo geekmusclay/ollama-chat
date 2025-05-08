@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import ChatView from '../views/ChatView.vue';
 import ConversationsView from '../views/ConversationsView.vue';
+import AssistantView from '../views/AssistantView.vue';
 
 const routes = [
   {
@@ -18,6 +19,12 @@ const routes = [
     path: '/chat/new',
     name: 'new-chat',
     component: ChatView
+  },
+  {
+    path: '/assistant/:id',
+    name: 'assistant',
+    component: AssistantView,
+    props: true
   }
 ];
 

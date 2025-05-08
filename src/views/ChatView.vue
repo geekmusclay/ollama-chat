@@ -14,6 +14,7 @@
     <MessageList 
       :messages="messages" 
       :loading="loading" 
+      :generating="isGenerating"
       :error="error" 
       :selected-model="selectedModel"
       @retry="fetchConversation"
@@ -201,7 +202,7 @@ export default {
               
               if (saveResponse.data.success) {
                 // Mettre à jour l'ID du message avec celui retourné par l'API
-                this.messages[assistantIndex].id = saveResponse.data.data.messageId;
+                this.messages[assistantIndex].id = saveResponse.data.messageId;
                 this.messages[assistantIndex].isStreaming = false;
               }
             } catch (saveError) {

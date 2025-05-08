@@ -111,7 +111,7 @@ export default {
       }
       
       try {
-        const response = await axios.put(`http://localhost:8000/back/conversations/${this.conversation.id}`, {
+        const response = await axios.put(`http://localhost:8000/conversations/${this.conversation.id}`, {
           title: this.newTitle
         });
         
